@@ -1,0 +1,6 @@
+.env
+data
+client-files
+__pycache__
+tests
+*.png

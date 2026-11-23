@@ -1,0 +1,71 @@
+name: highleads
+services:
+  prepare-storage:
+    image: python:3.12-slim
+    user: "0:0"
+    restart: "no"
+    network_mode: none
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /mnt/apps/highleads/data:/data
+      - /mnt/photographers_data/highleadclients:/clients
+    command:
+      - python
+      - -c
+      - |
+        import os
+        for path in ('/data', '/clients'):
+            os.chown(path, 10001, 10001)
+        print('Highleads storage prepared.')
+
+  highleads:
+    image: highleads-local:foundation-20261123
+    build:
+      context: https://github.com/valianktni1/highleads.git#main
+    depends_on:
+      prepare-storage:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    user: "10001:10001"
+    init: true
+    ports:
+      - "${HIGHLEADS_BIND_IP:-0.0.0.0}:30064:8000"
+    environment:
+      ADMIN_PASSWORD: "${HIGHLEADS_PASSWORD:?Set HIGHLEADS_PASSWORD in Dockge .env (minimum 16 characters)}"
+      APIFY_TOKEN: "${APIFY_TOKEN:-}"
+      PUBLIC_URL: "https://highleads.ivorydigital.uk"
+      DATA_DIR: /data
+      CLIENT_FILES_DIR: /clients
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - /mnt/apps/highleads/data:/data
+      - /mnt/photographers_data/highleadclients:/clients
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import socket; s=socket.create_connection(('127.0.0.1',8000),5); s.close()"
+      interval: 30s
+      timeout: 10s
+      start_period: 45s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

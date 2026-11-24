@@ -62,7 +62,7 @@ async def protect(request, call_next):
         try:
             scheme, payload = request.headers.get('authorization', '').split(' ', 1)
             user, password = base64.b64decode(payload, validate=True).decode().split(':', 1)
-            valid = scheme.lower() == 'basic' and hmac.compare_digest(user, 'mark') and hmac.compare_digest(password, PASSWORD)
+            valid = scheme.lower() == 'basic' and hmac.compare_digest(user.encode('utf-8'), b'mark') and hmac.compare_digest(password.encode('utf-8'), PASSWORD.encode('utf-8'))
         except Exception:
             valid = False
         if not valid:

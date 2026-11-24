@@ -1,4 +1,4 @@
-import csv, io, os, tempfile, unittest
+import base64, csv, io, os, tempfile, unittest
 from unittest.mock import patch
 os.environ['ADMIN_PASSWORD']='example-password-for-testing-only'
 os.environ['APP_SECRET']='example-test-secret-with-at-least-32-characters'
@@ -29,6 +29,18 @@ class AppTests(unittest.TestCase):
         self.assertEqual(TestClient(app.app).get('/').status_code,401)
         self.assertEqual(self.client.post('/lead',data={'name':'Bad'}).status_code,400)
         self.assertEqual(self.client.get('/').status_code,200)
+
+    def test_unicode_password_authentication(self):
+        password = 'Long-password-with-£-é-🔒'
+        def header(user, candidate):
+            token = base64.b64encode((user+':'+candidate).encode('utf-8')).decode('ascii')
+            return {'Authorization': 'Basic '+token}
+        client = TestClient(app.app)
+        with patch.object(app, 'PASSWORD', password):
+            self.assertEqual(client.get('/', headers=header('mark', password)).status_code, 200)
+            self.assertEqual(client.get('/', headers=header('mark', password+'wrong')).status_code, 401)
+            self.assertEqual(client.get('/', headers=header('wrong-user', password)).status_code, 401)
+            self.assertEqual(client.get('/', headers={'Authorization':'Basic invalid!'}).status_code, 401)
 
     def test_preview_draft_token_expiry_and_escaping(self):
         lid=self.lead('<script>alert(1)</script>')
